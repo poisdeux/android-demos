@@ -50,7 +50,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
     }
 
     private class MeasureBarDivider(val drawableDivider: Drawable): RecyclerView.ItemDecoration() {
-        override fun onDrawOver(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {
+        override fun onDrawOver(c: Canvas, parent: RecyclerView, state: State) {
             val childCount = parent.childCount
             for (i in 0 until childCount - 1) {
                 if (i % 4 != 0) continue
@@ -60,7 +60,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
                 val dividerTop = child.top
                 val dividerBottom = child.bottom
 
-                val params = child.layoutParams as RecyclerView.LayoutParams
+                val params = child.layoutParams as LayoutParams
 
                 val dividerLeft = child.left - (params.leftMargin + (drawableDivider.intrinsicWidth / 2))
                 val dividerRight = dividerLeft + drawableDivider.intrinsicWidth
@@ -73,9 +73,6 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
 
     private class GridLayoutClusteringManager(@RecyclerView.Orientation val orientation: Int, val spanCount: Int): RecyclerView.LayoutManager() {
         internal var childWidth: Int = 0
-        private var horizontalScrollOffset = 0
-        private var verticalScrollOffset = 0
-        private var rows = 0
         private var firstPosition = 0
         private var lastPosition = 0
 
@@ -97,20 +94,13 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
             //Afterwards any views left on the scrap can be recycled.
             detachAndScrapAttachedViews(recycler)
 
-//            firstPosition = ( verticalScrollOffset / childWidth ) * spanCount
-
-            rows = height / childWidth + 1 // 1 extra for rows at bottom/top boundaries
+            val rows = height / childWidth + 1 // 1 extra for rows at bottom/top boundaries
             lastPosition = firstPosition + ( rows * spanCount ) - 1
             if ( lastPosition >= itemCount )
                 lastPosition = itemCount - 1
 
-//            maxVerticalScrollOffset = ( itemCount / spanCount - 2 ) * childWidth
-
-            for (index in firstPosition..lastPosition) {
-                val view = recycler.getViewForPosition(index)
-                addView(view)
-
-                layoutChildView(index, childWidth, childWidth, view)
+            for (row in 0 until rows) {
+                addRow(row, recycler, 0, row * childWidth)
             }
 
             val scrapListCopy = recycler.scrapList.toList()
@@ -125,8 +115,6 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
             if (recycler == null || state == null)
                 return 0
 
-            verticalScrollOffset += dy
-
             var scrolled = 0
             if ( dy < 0 ) {
                 while (scrolled > dy) {
@@ -135,58 +123,73 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
                     val scrollBy = min(scrolled - dy, hangingTop)
                     scrolled -= scrollBy
                     offsetChildrenVertical(scrollBy)
-                    if (firstPosition > 0 && scrolled > dy) {
-                        firstPosition -= spanCount
 
-                        for ((index, position) in (firstPosition..(firstPosition+spanCount)).withIndex()) {
-                            val v = recycler.getViewForPosition(position)
-                            addView(v, index)
-                            layoutChildView(position, childWidth, childWidth, v)
-                        }
+                    if (topView.bottom > 0 && firstPosition > 0) {
+                        firstPosition -= spanCount
+                        if (firstPosition < 0) firstPosition = 0
+                        prependRow(firstPosition, recycler, topView.left, topView.top)
                     } else {
                         break
                     }
                 }
             } else if ( dy > 0 ) {
                 while (scrolled < dy) {
-                    val bottomView = getChildAt(childCount - 1) ?: break
+                    val bottomView = getChildAt(childCount - 1) ?: return 0
                     val hangingBottom = max(getDecoratedBottom(bottomView) - height, 0)
                     val scrollBy = -min(dy - scrolled, hangingBottom)
                     scrolled -= scrollBy
                     offsetChildrenVertical(scrollBy)
 
-                    if ( scrolled < dy && lastPosition < itemCount ) { // bottomView is visible so we now should add an additional row if possible
+                    if (bottomView.top < height && lastPosition < itemCount - 1) { // bottomView is visible so we now should add an additional row if possible
                         lastPosition += spanCount
-                        if (scrolled < dy && state.itemCount > lastPosition) {
-                            for (position in (lastPosition - spanCount + 1)..lastPosition) {
-                                val v = recycler.getViewForPosition(position)
-                                addView(v)
-                                layoutChildView(position, childWidth, childWidth, v)
-                            }
-                        } else {
-                            break
-                        }
+                        if (state.itemCount < lastPosition) lastPosition = state.itemCount - 1
+                        addRow((lastPosition + 1) / spanCount - 1, recycler, 0, getDecoratedBottom(bottomView))
+                    } else {
+                        break
                     }
                 }
             }
-
-            return dy
+            return scrolled
         }
 
         override fun canScrollHorizontally(): Boolean = orientation == HORIZONTAL
 
         override fun scrollHorizontallyBy(dx: Int, recycler: Recycler?, state: State): Int {
             recycler?.let {
-                horizontalScrollOffset += dx
                 onLayoutChildren(recycler, state)
             }
             return dx
         }
 
-        private fun layoutChildView(i: Int, viewWidth: Int, viewHeight: Int, view: View) {
-            val left = (i % spanCount) * viewWidth - horizontalScrollOffset
+        private fun prependRow(row: Int, recycler: Recycler, horizontalOffset: Int, verticalOffset: Int) {
+            val startIndex = row * spanCount
+            val endIndex = startIndex + spanCount
+
+            for ((column, position) in (startIndex until endIndex).withIndex()) {
+                val v = recycler.getViewForPosition(position)
+                addView(v, column)
+                layoutChildView(row, column, childWidth, childWidth, v, horizontalOffset, verticalOffset)
+            }
+        }
+
+        /**
+         * @param row: zero-based
+         */
+        private fun addRow(row: Int, recycler: Recycler, xPos: Int, yPos: Int) {
+            val startIndex = row * spanCount
+            val endIndex = startIndex + spanCount
+
+            for ((column, position) in (startIndex until endIndex).withIndex()) {
+                val v = recycler.getViewForPosition(position)
+                addView(v)
+                layoutChildView(row, column, childWidth, childWidth, v, xPos, yPos)
+            }
+        }
+
+        private fun layoutChildView(row: Int, column: Int, viewWidth: Int, viewHeight: Int, view: View, xPos: Int, yPos: Int) {
+            val left = column * viewWidth + xPos
             val right = left + viewWidth
-            val top = (i / spanCount) * viewHeight - verticalScrollOffset
+            val top = yPos
             val bottom = top + viewHeight
 
             measureChildWithMargins(view, viewWidth, viewHeight)
