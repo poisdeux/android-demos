@@ -10,8 +10,6 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
-import kotlin.math.max
-import kotlin.math.min
 
 
 class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr) {
@@ -22,7 +20,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
         setHasFixedSize(true)
         adapter = MyAdapter()
 
-        val gridLayoutManager = GridLayoutClusteringManager( VERTICAL, 8)
+        val gridLayoutManager = GridLayoutClusteringManager( VERTICAL, 8, adapter?.itemCount ?: 0)
         layoutManager = gridLayoutManager
 
         ContextCompat.getDrawable(context, R.drawable.measure_line)?.let {
@@ -68,13 +66,15 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
                 drawableDivider.setBounds(dividerLeft, dividerTop, dividerRight, dividerBottom)
                 drawableDivider.draw(c)
             }
-        }
+        }b
     }
 
-    private class GridLayoutClusteringManager(@RecyclerView.Orientation val orientation: Int, val spanCount: Int): RecyclerView.LayoutManager() {
+    private class GridLayoutClusteringManager(@RecyclerView.Orientation val orientation: Int, val spanCount: Int, val maxItems: Int): RecyclerView.LayoutManager() {
         internal var childWidth: Int = 0
-        private var firstPosition = 0
-        private var lastPosition = 0
+        private var verticalScrollOffset = 0
+        private var maxVerticalScrollOffset = 0
+        private var amountOfVisibleRows = 0
+        private var maxRows = 0
 
         override fun generateDefaultLayoutParams(): LayoutParams {
             return LayoutParams(
@@ -84,23 +84,32 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
         }
 
         override fun onLayoutChildren(recycler: Recycler, state: State?) {
-            val totalSpace = width - paddingRight - paddingLeft
-            childWidth = totalSpace / spanCount
+            if (childWidth == 0) {
+                val totalSpace = width - paddingRight - paddingLeft
+                childWidth = totalSpace / spanCount
 
-            //Put all attached view onto the scrap
+                maxRows = maxItems / spanCount
+                if (maxItems > maxRows * spanCount) {
+                    //Add one extra row to accomodate last items that do not occupy all cells in the last row
+                    maxRows++
+                }
+
+                amountOfVisibleRows = height / childWidth + 1 // 1 extra for rows at bottom/top boundaries
+
+                maxVerticalScrollOffset = childWidth * maxRows - amountOfVisibleRows
+            }
+
+            //Put all attached views onto the scrap
             //We then get the required views from the recycler.
             //Recycler may choose to use the scrap to return the view.
             //We add the required views to the layout
             //Afterwards any views left on the scrap can be recycled.
             detachAndScrapAttachedViews(recycler)
 
-            val rows = height / childWidth + 1 // 1 extra for rows at bottom/top boundaries
-            lastPosition = firstPosition + ( rows * spanCount ) - 1
-            if ( lastPosition >= itemCount )
-                lastPosition = itemCount - 1
-
-            for (row in 0 until rows) {
-                addRow(row, recycler, 0, row * childWidth)
+            val firstVisibleRow = verticalScrollOffset/childWidth
+            val lastVisibleRow = firstVisibleRow + amountOfVisibleRows
+            for (row in firstVisibleRow until lastVisibleRow) {
+                addRow(row, recycler, 0, row * childWidth - verticalScrollOffset)
             }
 
             val scrapListCopy = recycler.scrapList.toList()
@@ -117,38 +126,36 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
 
             var scrolled = 0
             if ( dy < 0 ) {
-                while (scrolled > dy) {
-                    val topView = getChildAt(0)
-                    val hangingTop = max(-getDecoratedTop(topView!!), 0)
-                    val scrollBy = min(scrolled - dy, hangingTop)
-                    scrolled -= scrollBy
-                    offsetChildrenVertical(scrollBy)
+                if (verticalScrollOffset <= 0)
+                    return 0 // End reached
 
-                    if (topView.bottom > 0 && firstPosition > 0) {
-                        firstPosition -= spanCount
-                        if (firstPosition < 0) firstPosition = 0
-                        prependRow(firstPosition, recycler, topView.left, topView.top)
-                    } else {
-                        break
-                    }
+                verticalScrollOffset += dy
+                val scrollBy: Int
+                if (verticalScrollOffset < 0) {
+                    scrollBy = dy + verticalScrollOffset
+                    verticalScrollOffset = 0
+                } else {
+                    scrollBy = dy
                 }
+                scrolled = scrollBy
             } else if ( dy > 0 ) {
-                while (scrolled < dy) {
-                    val bottomView = getChildAt(childCount - 1) ?: return 0
-                    val hangingBottom = max(getDecoratedBottom(bottomView) - height, 0)
-                    val scrollBy = -min(dy - scrolled, hangingBottom)
-                    scrolled -= scrollBy
-                    offsetChildrenVertical(scrollBy)
 
-                    if (bottomView.top < height && lastPosition < itemCount - 1) { // bottomView is visible so we now should add an additional row if possible
-                        lastPosition += spanCount
-                        if (state.itemCount < lastPosition) lastPosition = state.itemCount - 1
-                        addRow((lastPosition + 1) / spanCount - 1, recycler, 0, getDecoratedBottom(bottomView))
-                    } else {
-                        break
-                    }
+                if (verticalScrollOffset >= maxVerticalScrollOffset)
+                    return 0 // End reached
+
+                verticalScrollOffset += dy
+                val scrollBy: Int
+                if (verticalScrollOffset > maxVerticalScrollOffset) {
+                    scrollBy = dy - (maxVerticalScrollOffset - verticalScrollOffset)
+                    verticalScrollOffset = maxVerticalScrollOffset
+                } else {
+                    scrollBy = dy
                 }
+                scrolled = scrollBy
             }
+
+            onLayoutChildren(recycler, state)
+
             return scrolled
         }
 
@@ -161,17 +168,6 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
             return dx
         }
 
-        private fun prependRow(row: Int, recycler: Recycler, horizontalOffset: Int, verticalOffset: Int) {
-            val startIndex = row * spanCount
-            val endIndex = startIndex + spanCount
-
-            for ((column, position) in (startIndex until endIndex).withIndex()) {
-                val v = recycler.getViewForPosition(position)
-                addView(v, column)
-                layoutChildView(row, column, childWidth, childWidth, v, horizontalOffset, verticalOffset)
-            }
-        }
-
         /**
          * @param row: zero-based
          */
@@ -182,11 +178,11 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
             for ((column, position) in (startIndex until endIndex).withIndex()) {
                 val v = recycler.getViewForPosition(position)
                 addView(v)
-                layoutChildView(row, column, childWidth, childWidth, v, xPos, yPos)
+                layoutChildView(column, childWidth, childWidth, v, xPos, yPos)
             }
         }
 
-        private fun layoutChildView(row: Int, column: Int, viewWidth: Int, viewHeight: Int, view: View, xPos: Int, yPos: Int) {
+        private fun layoutChildView(column: Int, viewWidth: Int, viewHeight: Int, view: View, xPos: Int, yPos: Int) {
             val left = column * viewWidth + xPos
             val right = left + viewWidth
             val top = yPos
