@@ -66,7 +66,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
                 drawableDivider.setBounds(dividerLeft, dividerTop, dividerRight, dividerBottom)
                 drawableDivider.draw(c)
             }
-        }b
+        }
     }
 
     private class GridLayoutClusteringManager(@RecyclerView.Orientation val orientation: Int, val spanCount: Int, val maxItems: Int): RecyclerView.LayoutManager() {
@@ -96,7 +96,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
 
                 amountOfVisibleRows = height / childWidth + 1 // 1 extra for rows at bottom/top boundaries
 
-                maxVerticalScrollOffset = childWidth * maxRows - amountOfVisibleRows
+                maxVerticalScrollOffset = childWidth * (maxRows - amountOfVisibleRows + 1)
             }
 
             //Put all attached views onto the scrap
@@ -107,7 +107,10 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
             detachAndScrapAttachedViews(recycler)
 
             val firstVisibleRow = verticalScrollOffset/childWidth
-            val lastVisibleRow = firstVisibleRow + amountOfVisibleRows
+            var lastVisibleRow = firstVisibleRow + amountOfVisibleRows
+            if (lastVisibleRow > maxRows)
+                lastVisibleRow = maxRows
+
             for (row in firstVisibleRow until lastVisibleRow) {
                 addRow(row, recycler, 0, row * childWidth - verticalScrollOffset)
             }
