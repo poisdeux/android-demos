@@ -84,7 +84,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
         }
 
         override fun onLayoutChildren(recycler: Recycler, state: State?) {
-            if (childWidth == 0) {
+            if (childCount == 0) { // empty layout so this is either the first run or layout size changed
                 val totalSpace = width - paddingRight - paddingLeft
                 childWidth = totalSpace / spanCount
 
@@ -185,17 +185,17 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
             for ((column, position) in (startIndex until endIndex).withIndex()) {
                 val v = recycler.getViewForPosition(position)
                 addView(v)
-                layoutChildView(column, childWidth, childWidth, v, xPos, yPos)
+                layoutChildView(column, v, xPos, yPos)
             }
         }
 
-        private fun layoutChildView(column: Int, viewWidth: Int, viewHeight: Int, view: View, xPos: Int, yPos: Int) {
-            val left = column * viewWidth + xPos
-            val right = left + viewWidth
+        private fun layoutChildView(column: Int, view: View, xPos: Int, yPos: Int) {
+            val left = column * childWidth + xPos
+            val right = left + childWidth
             val top = yPos
-            val bottom = top + viewHeight
+            val bottom = top + childWidth
 
-            measureChildWithMargins(view, viewWidth, viewHeight)
+            measureChildWithMargins(view, childWidth, childWidth)
 
             layoutDecoratedWithMargins(view, left, top, right, bottom)
         }
