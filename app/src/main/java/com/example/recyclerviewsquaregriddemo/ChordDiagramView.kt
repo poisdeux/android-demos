@@ -135,7 +135,9 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
                 verticalScrollOffset += dy
                 val scrollBy: Int
                 if (verticalScrollOffset < 0) {
-                    scrollBy = dy + verticalScrollOffset
+                    //When the start of the list is reached, scrollVerticallyBy must return the scrolled distance with
+                    //an opposite sign.
+                    scrollBy = dy + -verticalScrollOffset
                     verticalScrollOffset = 0
                 } else {
                     scrollBy = dy
@@ -149,7 +151,9 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
                 verticalScrollOffset += dy
                 val scrollBy: Int
                 if (verticalScrollOffset > maxVerticalScrollOffset) {
-                    scrollBy = dy - (maxVerticalScrollOffset - verticalScrollOffset)
+                    //When the end of the list is reached, scrollVerticallyBy must return the scrolled distance with
+                    //an opposite sign.
+                    scrollBy = (maxVerticalScrollOffset - verticalScrollOffset) - dy
                     verticalScrollOffset = maxVerticalScrollOffset
                 } else {
                     scrollBy = dy
