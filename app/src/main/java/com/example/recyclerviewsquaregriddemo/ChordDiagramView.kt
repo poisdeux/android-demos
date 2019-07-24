@@ -14,18 +14,25 @@ import androidx.recyclerview.widget.RecyclerView
 
 class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr) {
 
+    var beatsPerMeasure = 4
+
+    private val measureDividerWidth = 16
+    private val spanCount = 8
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
 
         setHasFixedSize(true)
         adapter = MyAdapter()
 
-        val gridLayoutManager = GridLayoutClusteringManager( VERTICAL, 8, adapter?.itemCount ?: 0)
-        layoutManager = gridLayoutManager
-
         ContextCompat.getDrawable(context, R.drawable.measure_line)?.let {
-            addItemDecoration(MeasureBarDivider(it))
+            addItemDecoration(MeasureBarDivider(it, measureDividerWidth, beatsPerMeasure, spanCount))
         }
+
+        val gridLayoutManager = GridLayoutClusteringManager( VERTICAL, spanCount, adapter?.itemCount ?: 0,
+            measureDividerWidth, beatsPerMeasure )
+
+        layoutManager = gridLayoutManager
     }
 
     private class MyAdapter: RecyclerView.Adapter<MyAdapter.MyViewHolder>() {
@@ -47,11 +54,13 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
         }
     }
 
-    private class MeasureBarDivider(val drawableDivider: Drawable): RecyclerView.ItemDecoration() {
+    private class MeasureBarDivider(val drawableDivider: Drawable, measureWidth: Int, val beatsPerMeasure: Int,
+                                    val spanCount: Int): RecyclerView.ItemDecoration() {
+        private val halfMeasureHorizontalOffset = measureWidth / 2 + drawableDivider.intrinsicWidth / 2
         override fun onDrawOver(c: Canvas, parent: RecyclerView, state: State) {
             val childCount = parent.childCount
-            for (i in 0 until childCount - 1) {
-                if (i % 4 != 0) continue
+            for (i in 0 until childCount) {
+                if (i % spanCount == 0 || i % beatsPerMeasure != 0) continue
 
                 val child = parent.getChildAt(i)
 
@@ -60,7 +69,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
 
                 val params = child.layoutParams as LayoutParams
 
-                val dividerLeft = child.left - (params.leftMargin + (drawableDivider.intrinsicWidth / 2))
+                val dividerLeft = child.left - params.leftMargin - halfMeasureHorizontalOffset
                 val dividerRight = dividerLeft + drawableDivider.intrinsicWidth
 
                 drawableDivider.setBounds(dividerLeft, dividerTop, dividerRight, dividerBottom)
@@ -69,12 +78,17 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
         }
     }
 
-    private class GridLayoutClusteringManager(@RecyclerView.Orientation val orientation: Int, val spanCount: Int, val maxItems: Int): RecyclerView.LayoutManager() {
+    private class GridLayoutClusteringManager(@RecyclerView.Orientation val orientation: Int,
+                                              val spanCount: Int,
+                                              val maxItems: Int,
+                                              val measureWidth: Int,
+                                              val beatsPerMeasure: Int): RecyclerView.LayoutManager() {
         internal var childWidth: Int = 0
         private var verticalScrollOffset = 0
         private var maxVerticalScrollOffset = 0
         private var amountOfVisibleRows = 0
         private var maxRows = 0
+        private var amountOfMeasuresPerRow = 2
 
         override fun generateDefaultLayoutParams(): LayoutParams {
             return LayoutParams(
@@ -85,7 +99,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
 
         override fun onLayoutChildren(recycler: Recycler, state: State?) {
             if (childCount == 0) { // empty layout so this is either the first run or layout size changed
-                val totalSpace = width - paddingRight - paddingLeft
+                val totalSpace = width - paddingRight - paddingLeft - (amountOfMeasuresPerRow - 1) * measureWidth
                 childWidth = totalSpace / spanCount
 
                 maxRows = maxItems / spanCount
@@ -178,21 +192,26 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
         /**
          * @param row: zero-based
          */
-        private fun addRow(row: Int, recycler: Recycler, xPos: Int, yPos: Int) {
+        private fun addRow(row: Int, recycler: Recycler, horizontalOffset: Int, verticalOffset: Int) {
             val startIndex = row * spanCount
             val endIndex = startIndex + spanCount
+
+            var measureOffset = horizontalOffset
 
             for ((column, position) in (startIndex until endIndex).withIndex()) {
                 val v = recycler.getViewForPosition(position)
                 addView(v)
-                layoutChildView(column, v, xPos, yPos)
+                if (column % spanCount != 0 && column % beatsPerMeasure == 0) {
+                    measureOffset += measureWidth
+                }
+                addCell(column, v, measureOffset, verticalOffset)
             }
         }
 
-        private fun layoutChildView(column: Int, view: View, xPos: Int, yPos: Int) {
-            val left = column * childWidth + xPos
+        private fun addCell(column: Int, view: View, horizontalOffset: Int, verticalOffset: Int) {
+            val left = column * childWidth + horizontalOffset
             val right = left + childWidth
-            val top = yPos
+            val top = verticalOffset
             val bottom = top + childWidth
 
             measureChildWithMargins(view, childWidth, childWidth)

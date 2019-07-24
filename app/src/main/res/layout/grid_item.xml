@@ -4,7 +4,7 @@
                                                           android:layout_width="wrap_content"
                                                           android:layout_height="wrap_content"
                                                           android:background="@drawable/timed_object_background"
-                                                          android:layout_margin="8dp">
+                                                          android:layout_margin="1dp">
 
     <TextView android:id="@+id/tv_cell_number"
               android:layout_width="wrap_content"
