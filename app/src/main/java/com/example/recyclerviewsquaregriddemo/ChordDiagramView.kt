@@ -110,7 +110,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
 
                 amountOfVisibleRows = height / childWidth + 1 // 1 extra for rows at bottom/top boundaries
 
-                maxVerticalScrollOffset = childWidth * (maxRows - amountOfVisibleRows + 1)
+                maxVerticalScrollOffset = childWidth * (maxRows - amountOfVisibleRows)
             }
 
             //Put all attached views onto the scrap
