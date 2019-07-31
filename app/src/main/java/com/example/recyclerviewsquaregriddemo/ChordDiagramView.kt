@@ -88,7 +88,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
         private var maxVerticalScrollOffset = 0
         private var amountOfVisibleRows = 0
         private var maxRows = 0
-        private var amountOfMeasuresPerRow = 2
+        private var amountOfMeasuresPerRow = spanCount / beatsPerMeasure
 
         override fun generateDefaultLayoutParams(): LayoutParams {
             return LayoutParams(
