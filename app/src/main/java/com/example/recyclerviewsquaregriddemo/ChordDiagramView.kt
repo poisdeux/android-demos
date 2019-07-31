@@ -14,10 +14,11 @@ import androidx.recyclerview.widget.RecyclerView
 
 class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr) {
 
-    var beatsPerMeasure = 4
+    //Is this fixed? Or can it change during a song?
+    var beatsPerMeasure = 5
 
     private val measureDividerWidth = 16
-    private val spanCount = 8
+    private val measuresPerRow = 2
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
@@ -26,10 +27,11 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
         adapter = MyAdapter()
 
         ContextCompat.getDrawable(context, R.drawable.measure_line)?.let {
-            addItemDecoration(MeasureBarDivider(it, measureDividerWidth, beatsPerMeasure, spanCount))
+            addItemDecoration(MeasureBarDivider(it, measureDividerWidth, beatsPerMeasure,
+                measuresPerRow * beatsPerMeasure))
         }
 
-        val gridLayoutManager = GridLayoutClusteringManager( VERTICAL, spanCount, adapter?.itemCount ?: 0,
+        val gridLayoutManager = GridLayoutClusteringManager( VERTICAL, measuresPerRow * beatsPerMeasure, adapter?.itemCount ?: 0,
             measureDividerWidth, beatsPerMeasure )
 
         layoutManager = gridLayoutManager
@@ -86,6 +88,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
         internal var childWidth: Int = 0
         private var verticalScrollOffset = 0
         private var maxVerticalScrollOffset = 0
+        private var offsetToCenterRowsHorizontally = 0
         private var amountOfVisibleRows = 0
         private var maxRows = 0
         private var amountOfMeasuresPerRow = spanCount / beatsPerMeasure
@@ -99,12 +102,19 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
 
         override fun onLayoutChildren(recycler: Recycler, state: State?) {
             if (childCount == 0) { // empty layout so this is either the first run or layout size changed
-                val totalSpace = width - paddingRight - paddingLeft - (amountOfMeasuresPerRow - 1) * measureWidth
+                val spaceNeededForMeasureBars = (amountOfMeasuresPerRow - 1) * measureWidth
+                val totalSpace = width - paddingRight - paddingLeft - spaceNeededForMeasureBars
                 childWidth = totalSpace / spanCount
+
+                // Due to childWidth being integer the childWidth * spanCount rarely matches the complete view width
+                // We therefore calculate the difference and use that as horizontal offset to center the rows in the
+                // view
+                offsetToCenterRowsHorizontally =
+                    (width - (childWidth * spanCount + spaceNeededForMeasureBars + paddingRight + paddingLeft)) / 2
 
                 maxRows = maxItems / spanCount
                 if (maxItems > maxRows * spanCount) {
-                    //Add one extra row to accomodate last items that do not occupy all cells in the last row
+                    //Add one extra row to accommodate last items that do not occupy all cells in the last row
                     maxRows++
                 }
 
@@ -126,7 +136,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
                 lastVisibleRow = maxRows
 
             for (row in firstVisibleRow until lastVisibleRow) {
-                addRow(row, recycler, 0, row * childWidth - verticalScrollOffset)
+                addRow(row, recycler, offsetToCenterRowsHorizontally, row * childWidth - verticalScrollOffset)
             }
 
             val scrapListCopy = recycler.scrapList.toList()
