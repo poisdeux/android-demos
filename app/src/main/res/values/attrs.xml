@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="ChordDiagramView">
+        <attr name="measuresPerRow" format="integer"/>
+        <attr name="measureBarHorizontalMargin" format="dimension"/>
+    </declare-styleable>
+</resources>

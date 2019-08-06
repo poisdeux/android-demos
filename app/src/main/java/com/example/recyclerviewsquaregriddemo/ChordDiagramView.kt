@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,16 +15,49 @@ import androidx.recyclerview.widget.RecyclerView
 
 class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr) {
 
-    //Is this fixed? Or can it change during a song?
     var beatsPerMeasure = 5
+        set(value) {
+            field = value
+            invalidate()
+            requestLayout()
+        }
 
-    private val measureDividerWidth = 16
-    private val measuresPerRow = 2
+    var measureDividerWidth = 16
+        set(value) {
+            field = value
+            invalidate()
+            requestLayout()
+        }
+
+    var measuresPerRow = 2
+        set(value) {
+            field = value
+            invalidate()
+            requestLayout()
+        }
+
+    private val preCacheRows = 4
+
+    init {
+        context.theme.obtainStyledAttributes(
+            attrs,
+            R.styleable.ChordDiagramView,
+            0, 0).apply {
+            try {
+                measureDividerWidth = getDimensionPixelSize(R.styleable.ChordDiagramView_measureBarHorizontalMargin, measureDividerWidth)
+                measuresPerRow = getInteger(R.styleable.ChordDiagramView_measuresPerRow, measuresPerRow)
+            } finally {
+                recycle()
+            }
+        }
+    }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
 
         setHasFixedSize(true)
+        setItemViewCacheSize(beatsPerMeasure * measuresPerRow * preCacheRows)
+
         adapter = MyAdapter()
 
         ContextCompat.getDrawable(context, R.drawable.measure_line)?.let {
@@ -32,19 +66,20 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
         }
 
         val gridLayoutManager = GridLayoutClusteringManager( VERTICAL, measuresPerRow * beatsPerMeasure, adapter?.itemCount ?: 0,
-            measureDividerWidth, beatsPerMeasure )
+            measureDividerWidth, beatsPerMeasure, preCacheRows)
 
         layoutManager = gridLayoutManager
     }
 
     private class MyAdapter: RecyclerView.Adapter<MyAdapter.MyViewHolder>() {
+
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyViewHolder {
             val view = LayoutInflater.from(parent.context).inflate(R.layout.grid_item, parent, false)
             return MyViewHolder(view)
         }
 
         override fun getItemCount(): Int {
-            return 200
+            return 1000
         }
 
         override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
@@ -84,7 +119,8 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
                                               val spanCount: Int,
                                               val maxItems: Int,
                                               val measureWidth: Int,
-                                              val beatsPerMeasure: Int): RecyclerView.LayoutManager() {
+                                              val beatsPerMeasure: Int,
+                                              val preCacheRows: Int = 4): RecyclerView.LayoutManager() {
         internal var childWidth: Int = 0
         private var verticalScrollOffset = 0
         private var maxVerticalScrollOffset = 0
@@ -118,7 +154,7 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
                     maxRows++
                 }
 
-                amountOfVisibleRows = height / childWidth + 1 // 1 extra for rows at bottom/top boundaries
+                amountOfVisibleRows = height / childWidth + preCacheRows // 1 extra for rows at bottom/top boundaries
 
                 maxVerticalScrollOffset = childWidth * (maxRows - amountOfVisibleRows)
             }
