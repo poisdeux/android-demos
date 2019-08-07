@@ -1,15 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-                                                          android:orientation="vertical"
-                                                          android:layout_width="wrap_content"
-                                                          android:layout_height="wrap_content"
-                                                          android:background="@drawable/timed_object_background"
-                                                          android:layout_margin="1dp">
+             android:orientation="vertical"
+             android:layout_width="wrap_content"
+             android:layout_height="wrap_content"
+             android:background="@drawable/timed_object_background"
+             android:layout_margin="1dp">
 
     <TextView android:id="@+id/tv_cell_number"
               android:layout_width="wrap_content"
               android:layout_height="wrap_content"
               android:layout_gravity="center"
-              android:textColor="@color/darkAndFullOfErrors"/>
+              android:textColor="@color/darkAndFullOfErrors"
+              android:visibility="gone"/>
+
+    <ImageView android:layout_width="match_parent" android:layout_height="match_parent"
+               android:src="@drawable/ic_launcher_background"
+               android:scaleType="fitStart"/>
+
+    <ImageView android:layout_width="match_parent" android:layout_height="match_parent"
+               android:src="@drawable/ic_launcher_foreground"
+               android:scaleType="fitStart"/>
 
 </FrameLayout>

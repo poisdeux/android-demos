@@ -4,9 +4,9 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
+import android.view.View.MeasureSpec.AT_MOST
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -255,14 +255,19 @@ class ChordDiagramView @JvmOverloads constructor(context: Context, attrs: Attrib
         }
 
         private fun addCell(column: Int, view: View, horizontalOffset: Int, verticalOffset: Int) {
-            val left = column * childWidth + horizontalOffset
-            val right = left + childWidth
-            val top = verticalOffset
-            val bottom = top + childWidth
+            val lp = view.layoutParams as LayoutParams
 
-            measureChildWithMargins(view, childWidth, childWidth)
+            val measureSpecWidth = MeasureSpec.makeMeasureSpec(childWidth - lp.marginStart - lp.marginEnd, AT_MOST)
+            val measureSpecHeight= MeasureSpec.makeMeasureSpec(childWidth - lp.topMargin - lp.bottomMargin, AT_MOST)
 
-            layoutDecoratedWithMargins(view, left, top, right, bottom)
+            view.measure(measureSpecWidth, measureSpecHeight)
+
+            val left = column * childWidth + horizontalOffset + lp.marginStart
+            val right = left + view.measuredWidth
+            val top = verticalOffset + lp.topMargin
+            val bottom = top + view.measuredHeight
+
+            view.layout(left, top, right, bottom)
         }
     }
 }
